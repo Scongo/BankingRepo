@@ -1,8 +1,9 @@
 package za.co.bank.bankx.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import za.co.bank.bankx.constant.AccountCategory;
+import za.co.bank.bankx.constant.AccountType;
 import za.co.bank.bankx.domain.entities.TransactionRecord;
 import za.co.bank.bankx.domain.entities.User;
 import za.co.bank.bankx.domain.entities.UserAccount;
@@ -23,7 +24,7 @@ public class BankingService {
     private final TransactionRepository transactionRepository;
     private final NotificationService notificationService;
 
-
+   @Autowired
     public BankingService(CustomerRepository customerRepository,
                           AccountRepository accountRepository,
                           TransactionRepository transactionRepository,
@@ -46,7 +47,7 @@ public class BankingService {
 
 // Create Current account (payments enabled)
         UserAccount current = new UserAccount();
-        current.setAccountCategory(AccountCategory.CURRENT);
+        current.setAccountType(AccountType.CURRENT);
         current.setUser(user);
         current.setBalance(BigDecimal.ZERO);
         current.setPaymentsEnabled(true);
@@ -55,7 +56,7 @@ public class BankingService {
 
 // Create Savings account with joining bonus R500
         UserAccount savings = new UserAccount();
-        savings.setAccountCategory(AccountCategory.SAVINGS);
+        savings.setAccountType(AccountType.SAVINGS);
         savings.setUser(user);
         savings.setBalance(new BigDecimal("500.00"));
         savings.setPaymentsEnabled(false);
@@ -68,7 +69,7 @@ public class BankingService {
         transactionRecord.setToAccountId(savings.getId());
         transactionRecord.setAmount(new BigDecimal("500.00"));
         transactionRecord.setFee(BigDecimal.ZERO);
-        transactionRecord.setNarration("Joining bonus");
+        transactionRecord.setMessage("Joining bonus");
         transactionRecord.setInitiatedBy("SYSTEM_ONBOARD");
         transactionRepository.save(transactionRecord);
 
@@ -78,8 +79,8 @@ public class BankingService {
 
         return user;
     }
-    public List<UserAccount> getAccountsForCustomer(String customerId) {
-        return accountRepository.findByCustomerId(customerId);
+    public List<UserAccount> getAccountsForCustomer(String userId) {
+        return accountRepository.findByUserId(userId);
     }
     public List<TransactionRecord> getTransactionsForAccount(String accountId) {
         return transactionRepository.findByFromAccountIdOrToAccountIdOrderByTimestampDesc(accountId, accountId);
@@ -116,13 +117,13 @@ public class BankingService {
         transactionRecord.setToAccountId(to.getId());
         transactionRecord.setAmount(amount);
         transactionRecord.setFee(fee);
-        transactionRecord.setNarration("Internal transfer");
+        transactionRecord.setMessage("Internal transfer");
         transactionRecord.setInitiatedBy("INTERNAL");
         transactionRepository.save(transactionRecord);
 
 
 // If payment into savings, credit 0.5% interest on current balance
-        if (to.getAccountCategory() == AccountCategory.SAVINGS) {
+        if (to.getAccountType() == AccountType.SAVINGS) {
             BigDecimal interest = to.getBalance().multiply(new BigDecimal("0.005")).setScale(2, RoundingMode.HALF_UP);
             to.setBalance(to.getBalance().add(interest));
             accountRepository.save(to);
@@ -131,7 +132,7 @@ public class BankingService {
             interestTr.setToAccountId(to.getId());
             interestTr.setAmount(interest);
             interestTr.setFee(BigDecimal.ZERO);
-            interestTr.setNarration("Interest credit for payment received");
+            interestTr.setMessage("Interest credit for payment received");
             interestTr.setInitiatedBy("SYSTEM_INTEREST");
             transactionRepository.save(interestTr);
             notificationService.notifyCustomer(to.getUser().getId(), "Interest credited: " + interest);
@@ -147,14 +148,14 @@ public class BankingService {
 
     @Transactional
     public TransactionRecord processBankZTransaction(String fromAccId, String toAccId, BigDecimal amount, String initiatedBy) {
-// Bank Z can debit or credit customer accounts (trusted partner). No payment-enabled restriction.
+    // Bank Z can debit or credit customer accounts.
         UserAccount from = null;
         UserAccount to = null;
         if (fromAccId != null) from = accountRepository.findById(fromAccId).orElseThrow(() -> new IllegalArgumentException("From account not found"));
         if (toAccId != null) to = accountRepository.findById(toAccId).orElseThrow(() -> new IllegalArgumentException("To account not found"));
 
 
-        BigDecimal fee = BigDecimal.ZERO; // external partner transactions not charged extra by Bank X
+        BigDecimal fee = BigDecimal.ZERO;
 
 
         if (from != null) {
@@ -168,7 +169,7 @@ public class BankingService {
 
 
 // if credited into savings, apply 0.5% interest
-            if (to.getAccountCategory() == AccountCategory.SAVINGS) {
+            if (to.getAccountType() == AccountType.SAVINGS) {
                 BigDecimal interest = to.getBalance().multiply(new BigDecimal("0.005")).setScale(2, RoundingMode.HALF_UP);
                 to.setBalance(to.getBalance().add(interest));
                 accountRepository.save(to);
@@ -179,7 +180,7 @@ public class BankingService {
                 interestTr.setToAccountId(to.getId());
                 interestTr.setAmount(interest);
                 interestTr.setFee(BigDecimal.ZERO);
-                interestTr.setNarration("Interest credit after Bank Z credit");
+                interestTr.setMessage("Interest credit after Bank Z credit");
                 interestTr.setInitiatedBy("SYSTEM_INTEREST");
                 transactionRepository.save(interestTr);
                 notificationService.notifyCustomer(to.getUser().getId(), "Interest credited: " + interest);
@@ -192,14 +193,13 @@ public class BankingService {
         transactionRecord.setToAccountId(toAccId);
         transactionRecord.setAmount(amount);
         transactionRecord.setFee(fee);
-        transactionRecord.setNarration("Bank Z processed transaction");
+        transactionRecord.setMessage("Bank Z processed transaction");
         transactionRecord.setInitiatedBy(initiatedBy == null ? "BANK_Z" : initiatedBy);
         transactionRepository.save(transactionRecord);
 
 
         if (from != null) notificationService.notifyCustomer(from.getUser().getId(), "Debit by Bank Z: " + amount);
         if (to != null) notificationService.notifyCustomer(to.getUser().getId(), "Credit by Bank Z: " + amount);
-
 
         return transactionRecord;
     }

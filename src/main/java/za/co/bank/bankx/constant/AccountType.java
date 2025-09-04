@@ -1,5 +1,5 @@
 package za.co.bank.bankx.constant;
 
-public enum AccountCategory {
+public enum AccountType {
     SAVINGS, CURRENT
 }

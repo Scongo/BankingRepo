@@ -27,6 +27,6 @@ public class TransactionRecord {
     private BigDecimal amount;
     private BigDecimal fee;
     private OffsetDateTime timestamp = OffsetDateTime.now();
-    private String narration;
-    private String initiatedBy; // e.g., INTERNAL, BANK_Z
+    private String message;
+    private String initiatedBy;
 }

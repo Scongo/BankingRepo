@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import za.co.bank.bankx.constant.AccountCategory;
+import za.co.bank.bankx.constant.AccountType;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -19,7 +19,7 @@ public class UserAccount {
 
 
     @Enumerated(EnumType.STRING)
-    private AccountCategory accountCategory;
+    private AccountType accountType;
 
 
     @ManyToOne(optional = false)
