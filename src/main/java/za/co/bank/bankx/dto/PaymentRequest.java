@@ -1,0 +1,19 @@
+package za.co.bank.bankx.dto;
+
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.math.BigDecimal;
+
+@Getter
+@Setter
+public class PaymentRequest {
+    @NotBlank
+    private String fromAccountId;
+    @NotBlank
+    private String toAccountId;
+    @DecimalMin("0.01")
+    private BigDecimal amount;
+}
